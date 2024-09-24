@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"    # Puerto AMQP
+      - "15672:15672"  # Puerto del panel de control
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  consumer_java:
+    build: ./consumer_java  
+    container_name: consumer_java
+    depends_on:
+      - rabbitmq
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_QUEUE: cola1  
+    networks:
+      - rabbitmq_net
+
+  consumer_python:
+    image: python:3.10-slim
+    container_name: consumer_python
+    depends_on:
+      - rabbitmq
+    volumes:
+      - ./consumer_python.py:/app/consumer_python.py
+    working_dir: /app
+    command: >
+      sh -c "
+      pip install pika &&
+      python consumer_python.py
+      "
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_QUEUE: cola1
+    networks:
+      - rabbitmq_net
+
+  publisher_1:
+    image: ruby:3.1
+    container_name: publisher_1
+    depends_on:
+      - rabbitmq
+    volumes:
+      - ./publisher-1.rb:/app/publisher-1.rb
+    working_dir: /app
+    command: ruby publisher-1.rb
+    networks:
+      - rabbitmq_net
+
+  publisher_2:
+    image: ruby:3.1
+    container_name: publisher_2
+    depends_on:
+      - rabbitmq
+    volumes:
+      - ./publisher-2.rb:/app/publisher-2.rb
+    working_dir: /app
+    command: >
+      sh -c "
+      gem install bunny &&
+      ruby publisher-2.rb
+      " 
+    networks:
+      - rabbitmq_net
+
+networks:
+  rabbitmq_net:
+    driver: bridge
